@@ -16,7 +16,7 @@
  *    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  *
  *    
- *    Modern Calc 4, Kaer (C) 2014-2015 Kaer
+ *    Modern Calc, Kaer (C) 2014-2015 Kaer
  *    Modern Calc comes with ABSOLUTELY NO WARRANTY.
  *
  *    Author: Kaer (the.thin.king.way+2014@gmail.com)
@@ -47,6 +47,8 @@ const _ = Gettext.gettext;
 
 const Qty = Me.imports.module_data.unit_converter.quantities15;
 const MeasurementList = Me.imports.module_data.unit_converter.measurement_list;
+const UnitTranslation = Me.imports.module_data.libs.unit_translation;
+const TranslateExpression = UnitTranslation.translate;
 
 const PAGES = {
     CONVERSION: 'conversion-page',
@@ -450,7 +452,7 @@ const UnitConverterModule = new Lang.Class({
                     });
                     
                     let nameLabel = new St.Label({
-                        text: units[k].name,
+                        text: _(units[k].name),
                         style_class: "l-name"
                     });
                     
@@ -635,6 +637,10 @@ const UnitConverterModule = new Lang.Class({
     _expressionEntryKeyPress: function(actor, event) {
         let key = event.get_key_symbol();
         if(key == Clutter.KEY_Return || key == Clutter.KEY_KP_Enter || key == Clutter.KEY_ISO_Enter){
+
+            // trim spaces
+            this._expressionEntry.text = Utils.trimText(this._expressionEntry.text);
+
             this._convert();
 
             if(this._expressionEntry.text == ""){
@@ -728,10 +734,21 @@ const UnitConverterModule = new Lang.Class({
 
     _loadMeasurementList: function(){
         this._measurementList = MeasurementList.MeasurementList;
+
+        // translate measurement names
+        for(let k=0; k < this._measurementList.length; k++){
+            let measurement = this._measurementList[k];
+
+            if(measurement.hasOwnProperty('name')){
+                measurement.name = _(measurement.name);
+            }
+        }
     },
 
     _parseExpression: function(expr){
         if(expr && expr != ""){
+
+            if(expr.indexOf(' to ') != -1){ return false; }
 
             if(this._activeMeasurement !== null && 
                 this._activeMeasurement.valid_expression(expr)
@@ -764,14 +781,15 @@ const UnitConverterModule = new Lang.Class({
                     
                     expr = this._activeMeasurement.replace_text(expr);
 
-                    let parts = expr.split(' to ');
-                    let source = parts[0];
-                    let dest = parts[1];
+                    let parts = expr.split('>');
+                    let source = TranslateExpression(parts[0]);
+                    let dest = TranslateExpression(parts[1]);
                     
                     let qty = Qty.Qty(source);
                     let result = qty.toString(dest);
 
                     result = this._activeMeasurement.format_result(result);
+                    result = this._translateResultUnitName(result);
 
                     // fill the extra conv list
                     if(this._activeMeasurement.hasOwnProperty('available_units') &&
@@ -786,9 +804,10 @@ const UnitConverterModule = new Lang.Class({
                             if(units[k].hasOwnProperty('c_symbol')){
                                 extra_result = qty.toString(units[k].c_symbol);
 
-                                this._extraConvList.push(
-                                    this._activeMeasurement.format_result(extra_result)
-                                );
+                                extra_result = this._activeMeasurement.format_result(extra_result);
+                                extra_result = this._translateResultUnitName(extra_result);
+
+                                this._extraConvList.push(extra_result);
                             }
                         }
                     }
@@ -801,7 +820,7 @@ const UnitConverterModule = new Lang.Class({
                 } catch(e) {
                     
                     if(e instanceof Qty.Qty.Error) {
-                        this.set_status_message("error", e.message);
+                        this.set_status_message("error", _(e.message));
                     }
                     else {
                         this.set_status_message("error", _("Errors happened when trying to convert"));
@@ -814,6 +833,18 @@ const UnitConverterModule = new Lang.Class({
         } else {
             this.set_status_message("information", _("Insert an expression to convert"));
         }
+    },
+
+    _translateResultUnitName: function(result){
+        if(result != undefined && result != null && result != "" && result.indexOf(' ') > 0){
+            let parts = result.split(' ');
+
+            if(parts.length == 2){
+                result = parts [0] + ' ' + _(parts[1]);
+            }
+        }
+
+        return result;
     },
 
     _showResult: function(result){

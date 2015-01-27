@@ -16,7 +16,7 @@
  *    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  *
  *    
- *    Modern Calc 4, Kaer (C) 2014-2015 Kaer
+ *    Modern Calc, Kaer (C) 2014-2015 Kaer
  *    Modern Calc comes with ABSOLUTELY NO WARRANTY.
  *
  *    Author: Kaer (the.thin.king.way+2014@gmail.com)
@@ -136,27 +136,34 @@ const Dialog = new Lang.Class({
     },
 
     resize: function() {
-        let monitor = Main.layoutManager.currentMonitor;
-        let is_primary = monitor.index === Main.layoutManager.primaryIndex;
+        // primary monitor
+        let monitor = Main.layoutManager.primaryMonitor;
 
-        let available_height = monitor.height;
-        if(is_primary) available_height -= Main.panel.actor.height;
+        let available_height = monitor.height - Main.panel.actor.height;
 
         let my_width = monitor.width / 100 * this.params.width_percents;
         let my_height = available_height / 100 * this.params.height_percents;
 
         this._hidden_x = monitor.width;
-        
         this._target_x = this._hidden_x - my_width;
-        this.actor.y = Main.panel.actor.height;
-        
-        this.actor.x = this._hidden_x;
+
+        this._hidden_y = monitor.y - my_height;
+        this._target_y = this._hidden_y + Main.panel.actor.height + my_height;
+
+        if(Main.layoutManager.monitors.length == 1){
+            this.actor.x = this._hidden_x;
+            this.actor.y = Main.panel.actor.height;
+        } else {
+            this.actor.x = (monitor.width + monitor.x) - my_width;
+            this.actor.y = this._hidden_y;
+        }
 
         this.actor.width = my_width;
         this.actor.height = my_height;
 
         this.boxLayout.width  = my_width;
         this.boxLayout.height  = my_height;
+
     },
 
     show: function(animation, on_complete) {
@@ -177,18 +184,35 @@ const Dialog = new Lang.Class({
         this.resize();
 
         if(this.params.enable_reveal_animation && animation) {
-            Tweener.removeTweens(this.actor);
-            Tweener.addTween(this.actor, {
-                time: this.params.animation_time / St.get_slow_down_factor(),
-                transition: 'easeOutExpo',
-                x: this._target_x,
-                onComplete: Lang.bind(this, function() {
-                    if(typeof on_complete === 'function') on_complete();
-                })
-            });
+            if(Main.layoutManager.monitors.length == 1){
+                Tweener.removeTweens(this.actor);
+                Tweener.addTween(this.actor, {
+                    time: this.params.animation_time / St.get_slow_down_factor(),
+                    transition: 'easeOutExpo',
+                    x: this._target_x,
+                    onComplete: Lang.bind(this, function() {
+                        if(typeof on_complete === 'function') on_complete();
+                    })
+                });
+            } else {
+                Tweener.removeTweens(this.actor);
+                Tweener.addTween(this.actor, {
+                    time: this.params.animation_time / St.get_slow_down_factor(),
+                    transition: 'easeOutExpo',
+                    y: this._target_y,
+                    onComplete: Lang.bind(this, function() {
+                        if(typeof on_complete === 'function') on_complete();
+                    })
+                });
+            }
         }
         else {
-            this.actor.x = this._target_x;
+            if(Main.layoutManager.monitors.length == 1){
+                this.actor.x = this._target_x;
+            } else {
+                this.actor.y = this._target_y;
+            }
+            
             if(typeof on_complete === 'function') on_complete();
         }
 
@@ -207,20 +231,39 @@ const Dialog = new Lang.Class({
             : animation;
 
         if(this.params.enable_reveal_animation && animation) {
-            Tweener.removeTweens(this.actor);
-            Tweener.addTween(this.actor, {
-                time: this.params.animation_time / St.get_slow_down_factor(),
-                transition: 'easeInOutQuint',
-                x: this._hidden_x,
-                onComplete: Lang.bind(this, function() {
-                    this.actor.hide();
-                    if(typeof on_complete === 'function') on_complete();
-                })
-            });
+            if(Main.layoutManager.monitors.length == 1){
+                Tweener.removeTweens(this.actor);
+                Tweener.addTween(this.actor, {
+                    time: this.params.animation_time / St.get_slow_down_factor(),
+                    transition: 'easeInOutQuint',
+                    x: this._hidden_x,
+                    onComplete: Lang.bind(this, function() {
+                        this.actor.hide();
+                        if(typeof on_complete === 'function') on_complete();
+                    })
+                });
+            } else {
+                Tweener.removeTweens(this.actor);
+                Tweener.addTween(this.actor, {
+                    time: this.params.animation_time / St.get_slow_down_factor(),
+                    transition: 'easeInOutQuint',
+                    y: this._hidden_y,
+                    onComplete: Lang.bind(this, function() {
+                        this.actor.hide();
+                        if(typeof on_complete === 'function') on_complete();
+                    })
+                });
+            }
         }
         else {
             this.actor.hide();
-            this.actor.x = this._hidden_x;
+
+            if(Main.layoutManager.monitors.length == 1){
+                this.actor.x = this._hidden_x;
+            } else {
+                this.actor.y = this._hidden_y;
+            }
+
             if(typeof on_complete === 'function') on_complete();
         }
     },
